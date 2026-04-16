@@ -1,0 +1,104 @@
+# ============================================================
+# GitHub Actions CI Configuration
+# ============================================================
+# 自动化测试：每次 push 或 PR 时运行单元测试
+# Automated testing: run unit tests on every push or PR
+
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10"]
+
+    steps:
+      # 1. 检出代码
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. 设置 Python 环境
+      # 2. Setup Python environment
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # 3. 缓存 pip 依赖（加速 CI）
+      # 3. Cache pip dependencies (speed up CI)
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # 4. 安装 CPU 版 PyTorch（CI 环境无 GPU）
+      # 4. Install CPU-only PyTorch (no GPU in CI)
+      - name: Install PyTorch (CPU)
+        run: |
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+      # 5. 安装项目依赖
+      # 5. Install project dependencies
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      # 6. 代码风格检查（flake8）
+      # 6. Code style check (flake8)
+      - name: Lint with flake8
+        run: |
+          flake8 . \
+            --count \
+            --max-line-length=100 \
+            --exclude=.git,__pycache__,build,dist,*.egg-info \
+            --statistics
+
+      # 7. 运行单元测试
+      # 7. Run unit tests
+      - name: Run tests with pytest
+        run: |
+          pytest tests/ \
+            -v \
+            --tb=short \
+            --cov=. \
+            --cov-report=xml \
+            --cov-report=term-missing
+
+      # 8. 上传测试覆盖率报告
+      # 8. Upload coverage report
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  # 代码格式检查（black）
+  # Code format check (black)
+  format-check:
+    name: Check Code Format (black)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Install black
+        run: pip install black
+      - name: Check formatting with black
+        run: black --check --diff .

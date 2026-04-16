@@ -1,0 +1,79 @@
+# ============================================================
+# Default Configuration for Lightweight Image Classifier
+# ============================================================
+# 修改此文件以调整训练参数，命令行参数优先级高于此配置文件
+
+# 模型配置 / Model Configuration
+model:
+  name: resnet18              # 模型名称: resnet18, resnet34, resnet50,
+                              #           mobilenet_v2, mobilenet_v3_small, mobilenet_v3_large,
+                              #           shufflenet_v2_x0_5, shufflenet_v2_x1_0
+  pretrained: true            # 是否加载 ImageNet 预训练权重
+  num_classes: 10             # 分类类别数量
+
+# 数据配置 / Data Configuration
+data:
+  data_dir: ./data            # 数据集根目录（需含 train/ 和 val/ 子目录）
+  input_size: 224             # 输入图像尺寸（正方形）
+  num_workers: 4              # DataLoader 工作进程数
+  pin_memory: true            # 是否将数据固定在内存（GPU 训练时建议开启）
+
+# 训练配置 / Training Configuration
+training:
+  epochs: 100                 # 总训练轮数
+  batch_size: 32              # 批大小
+  lr: 0.01                   # 初始学习率
+  momentum: 0.9               # SGD 动量
+  weight_decay: 1.0e-4        # 权重衰减（L2 正则化）
+  amp: false                  # 是否开启自动混合精度 (AMP)
+  grad_clip: 0.0              # 梯度裁剪阈值（0 表示不裁剪）
+
+# 学习率调度 / LR Scheduler Configuration
+scheduler:
+  name: cosine                # 调度策略: step, cosine, plateau
+  # step 策略参数
+  step_size: 30               # 每隔多少 epoch 衰减一次
+  gamma: 0.1                  # 衰减系数
+  # cosine 策略参数
+  t_max: 100                  # 余弦退火周期（通常等于 epochs）
+  eta_min: 1.0e-6             # 最小学习率
+  # plateau 策略参数
+  patience: 10                # 等待多少 epoch 无改善后衰减
+  factor: 0.5                 # 衰减系数
+
+# 数据增强配置 / Augmentation Configuration
+augmentation:
+  # 训练集增强
+  train:
+    random_resized_crop: true   # 随机裁剪缩放
+    random_horizontal_flip: true # 随机水平翻转
+    flip_prob: 0.5              # 翻转概率
+    color_jitter: true          # 颜色抖动
+    brightness: 0.2             # 亮度变化范围
+    contrast: 0.2               # 对比度变化范围
+    saturation: 0.2             # 饱和度变化范围
+    hue: 0.1                    # 色调变化范围
+    random_erasing: false       # 随机擦除
+    erasing_prob: 0.2           # 擦除概率
+  # 验证集增强（通常只做中心裁剪）
+  val:
+    resize: 256                 # 先缩放到此尺寸
+    center_crop: 224            # 再中心裁剪
+
+# 检查点配置 / Checkpoint Configuration
+checkpoint:
+  save_dir: ./checkpoints      # 检查点保存目录
+  save_freq: 5                 # 每隔多少 epoch 保存一次
+  keep_last: 3                 # 保留最近几个检查点（0 表示全部保留）
+
+# 日志配置 / Logging Configuration
+logging:
+  log_dir: ./logs              # 日志文件保存目录
+  tensorboard_dir: ./runs      # TensorBoard 日志目录
+  log_freq: 10                 # 每隔多少 batch 打印一次日志
+  save_plots: true             # 是否保存训练曲线图
+
+# 设备配置 / Device Configuration
+device:
+  use_gpu: true                # 是否使用 GPU（若不可用则自动回退到 CPU）
+  gpu_ids: [0]                 # 使用的 GPU 编号列表（多 GPU 训练）

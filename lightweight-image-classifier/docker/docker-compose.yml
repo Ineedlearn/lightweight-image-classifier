@@ -1,0 +1,111 @@
+# ============================================================
+# Docker Compose for PyTorch Lightweight Image Classifier
+# ============================================================
+# 使用方法 / Usage:
+#   CPU 训练: docker-compose up cpu-trainer
+#   GPU 训练: docker-compose up gpu-trainer
+#   TensorBoard: docker-compose up tensorboard
+
+version: "3.8"
+
+services:
+  # CPU 训练服务
+  # CPU training service
+  cpu-trainer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: lightweight-image-classifier:latest
+    container_name: lic-cpu-trainer
+    volumes:
+      # 挂载数据集目录（只读）
+      # Mount dataset directory (read-only)
+      - ./data:/app/data:ro
+      # 挂载检查点目录（读写）
+      # Mount checkpoint directory (read-write)
+      - ./checkpoints:/app/checkpoints
+      # 挂载日志目录
+      # Mount log directory
+      - ./logs:/app/logs
+      - ./runs:/app/runs
+    command: >
+      python scripts/train.py
+        --model resnet18
+        --data_dir /app/data
+        --num_classes 10
+        --epochs 100
+        --batch_size 32
+        --lr 0.01
+    environment:
+      - PYTHONPATH=/app
+
+  # GPU 训练服务（需要 NVIDIA Docker 运行时）
+  # GPU training service (requires NVIDIA Docker runtime)
+  gpu-trainer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: lightweight-image-classifier:latest
+    container_name: lic-gpu-trainer
+    # GPU 资源配置
+    # GPU resource configuration
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./data:/app/data:ro
+      - ./checkpoints:/app/checkpoints
+      - ./logs:/app/logs
+      - ./runs:/app/runs
+    command: >
+      python scripts/train.py
+        --model mobilenet_v2
+        --data_dir /app/data
+        --num_classes 10
+        --epochs 100
+        --batch_size 64
+        --lr 0.01
+        --amp
+        --gpu 0
+    environment:
+      - PYTHONPATH=/app
+      - NVIDIA_VISIBLE_DEVICES=all
+
+  # TensorBoard 可视化服务
+  # TensorBoard visualization service
+  tensorboard:
+    image: tensorflow/tensorflow:latest
+    container_name: lic-tensorboard
+    ports:
+      # 将容器 6006 端口映射到主机 6006 端口
+      # Map container port 6006 to host port 6006
+      - "6006:6006"
+    volumes:
+      - ./runs:/runs:ro
+    command: tensorboard --logdir /runs --host 0.0.0.0 --port 6006
+
+  # 推理服务
+  # Inference service
+  inference:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: lightweight-image-classifier:latest
+    container_name: lic-inference
+    volumes:
+      - ./checkpoints:/app/checkpoints:ro
+      - ./test_images:/app/test_images:ro
+      - ./results:/app/results
+    command: >
+      python scripts/inference.py
+        --model resnet18
+        --checkpoint /app/checkpoints/best_model.pth
+        --image_dir /app/test_images
+        --num_classes 10
+        --output /app/results/predictions.json
+    environment:
+      - PYTHONPATH=/app
